@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -14,12 +15,22 @@ var (
 	buffer    = NewBuffer(10)
 )
 
+func AsyncHandleFunc(b *ircx.Bot, cmd string, handler func(s ircx.Sender, m *irc.Message)) {
+	b.Handle(cmd, AsyncHandlerFunc(handler))
+}
+
+type AsyncHandlerFunc func(s ircx.Sender, m *irc.Message)
+
+func (f AsyncHandlerFunc) Handle(s ircx.Sender, m *irc.Message) {
+	go f(s, m)
+}
+
 func RegisterHandlers(bot *ircx.Bot) {
-	bot.HandleFunc(irc.PING, PingHandler)
-	bot.HandleFunc(irc.RPL_WELCOME, WelcomeHandler)
-	bot.HandleFunc(irc.ERR_NICKNAMEINUSE, NickCollisionHandler)
-	bot.HandleFunc(irc.JOIN, JoinHandler)
-	bot.HandleFunc(irc.PRIVMSG, MsgHandler)
+	AsyncHandleFunc(bot, irc.PING, PingHandler)
+	AsyncHandleFunc(bot, irc.RPL_WELCOME, WelcomeHandler)
+	AsyncHandleFunc(bot, irc.ERR_NICKNAMEINUSE, NickCollisionHandler)
+	AsyncHandleFunc(bot, irc.JOIN, JoinHandler)
+	AsyncHandleFunc(bot, irc.PRIVMSG, MsgHandler)
 }
 
 func PingHandler(s ircx.Sender, m *irc.Message) {
@@ -59,7 +70,7 @@ func JoinHandler(s ircx.Sender, m *irc.Message) {
 
 func MsgHandler(s ircx.Sender, m *irc.Message) {
 	nick := m.Prefix.Name
-	channel := m.Params[0]
+	//channel := m.Params[0]
 	msg := m.Trailing
 	args := strings.Fields(msg)
 	buffer.Add(sanitizer.ReplaceAllString(msg, " "))
@@ -73,9 +84,8 @@ func MsgHandler(s ircx.Sender, m *irc.Message) {
 			})
 		}
 	}
-	log.Println(nick, channel, m.Trailing)
 }
 
 func CommandHandler(nick string, args []string) string {
-	return ""
+	return fmt.Sprintf("<%v> %v", nick, strings.Join(args, " "))
 }
