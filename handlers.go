@@ -17,6 +17,7 @@ var (
 func RegisterHandlers(bot *ircx.Bot) {
 	bot.HandleFunc(irc.PING, PingHandler)
 	bot.HandleFunc(irc.RPL_WELCOME, WelcomeHandler)
+	bot.HandleFunc(irc.ERR_NICKNAMEINUSE, NickCollisionHandler)
 	bot.HandleFunc(irc.JOIN, JoinHandler)
 	bot.HandleFunc(irc.PRIVMSG, MsgHandler)
 }
@@ -34,6 +35,16 @@ func WelcomeHandler(s ircx.Sender, m *irc.Message) {
 	s.Send(&irc.Message{
 		Command: irc.JOIN,
 		Params:  []string{*channels},
+	})
+}
+
+func NickCollisionHandler(s ircx.Sender, m *irc.Message) {
+	nick := m.Params[1]
+	*name = nick + "_"
+	log.Println(nick, "already in use, changing nick to", *name)
+	s.Send(&irc.Message{
+		Command: irc.NICK,
+		Params:  []string{*name},
 	})
 }
 
