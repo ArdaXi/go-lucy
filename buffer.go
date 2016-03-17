@@ -10,6 +10,7 @@ type Buffer struct {
 	cap  int
 	full bool
 	msgs chan string
+	done chan struct{}
 }
 
 func NewBuffer(capacity int) *Buffer {
@@ -20,6 +21,7 @@ func NewBuffer(capacity int) *Buffer {
 	b.ring.SetCapacity(capacity)
 	b.cap = capacity
 	b.msgs = make(chan string)
+	b.done = make(chan struct{})
 	go func() {
 		for msg := range b.msgs {
 			b.ring.Enqueue(msg)
@@ -29,6 +31,7 @@ func NewBuffer(capacity int) *Buffer {
 					b.full = true
 				}
 			}
+			b.done <- struct{}{}
 		}
 	}()
 	return b
@@ -36,6 +39,7 @@ func NewBuffer(capacity int) *Buffer {
 
 func (b *Buffer) Add(i string) {
 	b.msgs <- i
+	<-b.done
 }
 
 func (b *Buffer) List() []interface{} {
