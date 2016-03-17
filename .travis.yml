@@ -8,4 +8,4 @@ before_install:
 script:
   - go test -bench -race -v ./...
 after_success:
-$HOME/gopath/bin/goveralls -service=travis-ci
+  - $HOME/gopath/bin/goveralls -service=travis-ci
