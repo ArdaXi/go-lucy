@@ -10,30 +10,41 @@ import (
 	"github.com/sorcix/irc"
 )
 
-var (
-	sanitizer = regexp.MustCompile(`[^\w ']+`)
-	buffer    = NewBuffer(10)
-)
+var sanitizer = regexp.MustCompile(`[^\w ']+`)
 
-func AsyncHandleFunc(b *ircx.Bot, cmd string, handler func(s ircx.Sender, m *irc.Message)) {
-	b.Handle(cmd, AsyncHandlerFunc(handler))
+type Lucy struct {
+	buffer *Buffer
 }
 
-type AsyncHandlerFunc func(s ircx.Sender, m *irc.Message)
+func AsyncHandleFunc(l *Lucy, b *ircx.Bot, cmd string,
+	handlerFunc func(l *Lucy, s ircx.Sender, m *irc.Message)) {
+	handler := AsyncHandler{
+		handler: handlerFunc,
+		lucy:    l,
+	}
+	b.Handle(cmd, handler)
+}
 
-func (f AsyncHandlerFunc) Handle(s ircx.Sender, m *irc.Message) {
-	go f(s, m)
+type AsyncHandler struct {
+	handler func(l *Lucy, s ircx.Sender, m *irc.Message)
+	lucy    *Lucy
+}
+
+func (f AsyncHandler) Handle(s ircx.Sender, m *irc.Message) {
+	go f.handler(f.lucy, s, m)
 }
 
 func RegisterHandlers(bot *ircx.Bot) {
-	AsyncHandleFunc(bot, irc.PING, PingHandler)
-	AsyncHandleFunc(bot, irc.RPL_WELCOME, WelcomeHandler)
-	AsyncHandleFunc(bot, irc.ERR_NICKNAMEINUSE, NickCollisionHandler)
-	AsyncHandleFunc(bot, irc.JOIN, JoinHandler)
-	AsyncHandleFunc(bot, irc.PRIVMSG, MsgHandler)
+	lucy := &Lucy{buffer: NewBuffer(10)}
+
+	AsyncHandleFunc(lucy, bot, irc.PING, PingHandler)
+	AsyncHandleFunc(lucy, bot, irc.RPL_WELCOME, WelcomeHandler)
+	AsyncHandleFunc(lucy, bot, irc.ERR_NICKNAMEINUSE, NickCollisionHandler)
+	AsyncHandleFunc(lucy, bot, irc.JOIN, JoinHandler)
+	AsyncHandleFunc(lucy, bot, irc.PRIVMSG, MsgHandler)
 }
 
-func PingHandler(s ircx.Sender, m *irc.Message) {
+func PingHandler(l *Lucy, s ircx.Sender, m *irc.Message) {
 	log.Println("ping", m)
 	s.Send(&irc.Message{
 		Command:  irc.PONG,
@@ -42,14 +53,14 @@ func PingHandler(s ircx.Sender, m *irc.Message) {
 	})
 }
 
-func WelcomeHandler(s ircx.Sender, m *irc.Message) {
+func WelcomeHandler(l *Lucy, s ircx.Sender, m *irc.Message) {
 	s.Send(&irc.Message{
 		Command: irc.JOIN,
 		Params:  []string{*channels},
 	})
 }
 
-func NickCollisionHandler(s ircx.Sender, m *irc.Message) {
+func NickCollisionHandler(l *Lucy, s ircx.Sender, m *irc.Message) {
 	nick := m.Params[1]
 	*name = nick + "_"
 	log.Println(nick, "already in use, changing nick to", *name)
@@ -59,7 +70,7 @@ func NickCollisionHandler(s ircx.Sender, m *irc.Message) {
 	})
 }
 
-func JoinHandler(s ircx.Sender, m *irc.Message) {
+func JoinHandler(l *Lucy, s ircx.Sender, m *irc.Message) {
 	nick := m.Prefix.Name
 	if nick == *name {
 		log.Println("Joined", m.Trailing)
@@ -68,12 +79,12 @@ func JoinHandler(s ircx.Sender, m *irc.Message) {
 	}
 }
 
-func MsgHandler(s ircx.Sender, m *irc.Message) {
+func MsgHandler(l *Lucy, s ircx.Sender, m *irc.Message) {
 	nick := m.Prefix.Name
 	//channel := m.Params[0]
 	msg := m.Trailing
 	args := strings.Fields(msg)
-	buffer.Add(sanitizer.ReplaceAllString(msg, " "))
+	l.buffer.Add(sanitizer.ReplaceAllString(msg, " "))
 	if strings.TrimRight(args[0], ",:") == *name {
 		res := CommandHandler(nick, args[1:])
 		if res != "" {
