@@ -4,7 +4,13 @@ import (
 	"github.com/zfjagann/golang-ring"
 )
 
-type Buffer struct {
+type Buffer interface {
+	Add(string)
+	List() []interface{}
+	Full() bool
+}
+
+type buffer struct {
 	ring *ring.Ring
 	len  int
 	cap  int
@@ -13,8 +19,8 @@ type Buffer struct {
 	done chan struct{}
 }
 
-func NewBuffer(capacity int) *Buffer {
-	b := &Buffer{
+func NewBuffer(capacity int) *buffer {
+	b := &buffer{
 		ring: &ring.Ring{},
 	}
 
@@ -37,18 +43,18 @@ func NewBuffer(capacity int) *Buffer {
 	return b
 }
 
-func (b *Buffer) Add(i string) {
+func (b *buffer) Add(i string) {
 	b.msgs <- i
 	<-b.done
 }
 
-func (b *Buffer) List() []interface{} {
+func (b *buffer) List() []interface{} {
 	if !b.full {
 		return nil
 	}
 	return b.ring.Values()
 }
 
-func (b *Buffer) Full() bool {
+func (b *buffer) Full() bool {
 	return b.full
 }

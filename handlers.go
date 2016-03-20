@@ -13,7 +13,7 @@ import (
 var sanitizer = regexp.MustCompile(`[^\w ']+`)
 
 type Lucy struct {
-	buffer *Buffer
+	buffer Buffer
 }
 
 func AsyncHandleFunc(l *Lucy, b *ircx.Bot, cmd string,
